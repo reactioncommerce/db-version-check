@@ -4,21 +4,64 @@
 #
 version: 2
 jobs:
+  build:
+    docker:
+      - image: node:12.14.1
+
+    steps:
+      - checkout
+
+      - run: npm ci
+
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+
+  test-integration:
+    docker:
+      - image: circleci/node:14.11.0-stretch
+      # Integration tests need MongoDB server running and accessible on port 27017
+      - image: circleci/mongo:4.2.0
+        command: mongod --oplogSize 128 --replSet rs0 --storageEngine=wiredTiger
+        ports:
+          - "27017:27017"
+    steps:
+      - checkout
+      - run:
+          name: Run Integration Tests
+          environment:
+            MONGO_URL: mongodb://localhost:27017/test
+            MONGO_USE_UNIFIED_TOPOLOGY: false
+          command: npx --quiet --package @reactioncommerce/ci-scripts@1.12.2 run-integration-tests
   deploy:
     docker:
-      - image: circleci/node:12.14.1
+      - image: node:12.14.1
+    dependencies:
+      pre:
+        - echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
     working_directory: ~/repo
     steps:
       - checkout
-      - run: npm install
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "package.json" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
       - run: npx semantic-release
 
 workflows:
   version: 2
   deploy:
     jobs:
+      - build:
+      - test-integration:
+          requires:
+            - build
       - deploy:
           context: reaction-publish-semantic-release
+          requires:
+            - test-integration
           filters:
             branches:
               only: trunk
