@@ -1,3 +1,8 @@
+# This repository is deprecated
+
+This code is now located in our monorepo [here](https://github.com/reactioncommerce/reaction/tree/trunk/packages/db-version-check)
+
+
 # @reactioncommerce/db-version-check
 
 An NPM package that provides migrations for use with the `@reactioncommerce/migrator` CLI tool should use this package to check whether data is at the correct version before running any database commands.
